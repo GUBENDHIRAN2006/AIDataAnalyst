@@ -1,0 +1,57 @@
+services:
+  api:
+    build: .
+    command: ["uvicorn", "backend_api:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_API_KEY: ${APP_API_KEY:?Set APP_API_KEY in .env}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      GROQ_MAX_TOKENS: ${GROQ_MAX_TOKENS:-4096}
+      MAX_ROWS: ${MAX_ROWS:-500000}
+      MAX_COLUMNS: ${MAX_COLUMNS:-200}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-50}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+
+  frontend:
+    build: .
+    command:
+      - streamlit
+      - run
+      - app.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+      - --server.headless=true
+      - --browser.gatherUsageStats=false
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_API_URL: http://api:8000
+      APP_API_KEY: ${APP_API_KEY:?Set APP_API_KEY in .env}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      GROQ_MAX_TOKENS: ${GROQ_MAX_TOKENS:-4096}
+      MAX_ROWS: ${MAX_ROWS:-500000}
+      MAX_COLUMNS: ${MAX_COLUMNS:-200}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-50}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      API_TIMEOUT_SECONDS: ${API_TIMEOUT_SECONDS:-60}
+      MAX_TOOL_CALLS: ${MAX_TOOL_CALLS:-10}
+      MAX_RESULT_ROWS: ${MAX_RESULT_ROWS:-1000}
+      MAX_CHART_CATEGORIES: ${MAX_CHART_CATEGORIES:-50}
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

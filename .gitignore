@@ -1,0 +1,65 @@
+# =============================================================================
+# .gitignore - AI Data Analyst Project
+# =============================================================================
+
+# --- Secrets and Credentials ---
+.env
+*.pem
+*.key
+*.p12
+secrets/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# --- Virtual Environments ---
+venv/
+env/
+.venv/
+.env/
+ENV/
+
+# --- Testing and Coverage ---
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.log
+
+# --- IDE and OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Streamlit ---
+.streamlit/secrets.toml
+
+# --- Data (never commit real user data) ---
+uploads/
+*.csv
+!sample_data/*.csv
+!evaluation/*.jsonl
+
+# --- Docker ---
+.dockerignore
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+*.ipynb
+
+# --- Distribution ---
+*.whl
+*.tar.gz
