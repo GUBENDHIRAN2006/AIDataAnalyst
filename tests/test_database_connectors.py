@@ -168,3 +168,30 @@ def test_supabase_request_errors_do_not_echo_credentials(monkeypatch):
         })
 
     assert "secret-key" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected"),
+    [
+        (401, "rejected the API key"),
+        (403, "denied Data API access"),
+        (404, "endpoint was not found"),
+    ],
+)
+def test_supabase_table_listing_explains_api_failures(
+    monkeypatch,
+    status_code,
+    expected,
+):
+    monkeypatch.setattr(
+        connectors.requests,
+        "get",
+        Mock(return_value=_response(status_code, {"message": "provider detail"})),
+    )
+
+    with pytest.raises(DatabaseConnectionError, match=expected):
+        list_tables({
+            "provider": "Supabase",
+            "url": "https://project.supabase.co",
+            "key": "anon-key",
+        })

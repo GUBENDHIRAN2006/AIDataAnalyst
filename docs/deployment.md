@@ -27,6 +27,13 @@ and the `frontend/` folder. Do not add `.env`, API keys, or database passwords.
 5. Copy the project URL and the **anon/publishable** API key. Never use the
    `service_role` key.
 
+To import tables from Supabase, the project must also have its Data API enabled.
+Make sure the table's schema (commonly `public`) is exposed in the Data API
+settings and the key's database role has `SELECT` permission. Row-level security
+must allow that role to read rows; for user-specific policies, enter a valid
+user access token in the database connection form. Do not grant anonymous access
+to sensitive tables just to make discovery work.
+
 ## 3. Deploy FastAPI on Render
 
 1. The repository pins Render to Python 3.12 using `.python-version`.

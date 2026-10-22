@@ -400,9 +400,29 @@ def _supabase_tables(config: Mapping[str, Any]) -> list[TableRef]:
             timeout=10,
         )
         if response.status_code >= 400:
+            if response.status_code == 401:
+                detail = (
+                    "Supabase rejected the API key. Confirm the project URL and "
+                    "anon/publishable key are from the same project."
+                )
+            elif response.status_code == 403:
+                detail = (
+                    "Supabase denied Data API access. Expose the table's schema, "
+                    "grant SELECT to the key's role, and check its row-level security "
+                    "policy. For user-restricted tables, provide a valid user access token."
+                )
+            elif response.status_code == 404:
+                detail = (
+                    "Supabase Data API endpoint was not found. Check the project URL "
+                    "and enable the Data API for this project."
+                )
+            else:
+                detail = (
+                    f"Supabase Data API returned HTTP {response.status_code}. "
+                    "Check the project status and Data API settings."
+                )
             raise DatabaseConnectionError(
-                "Supabase could not list accessible tables. Check the project URL, "
-                "key, and Data API access."
+                detail
             )
         paths = response.json().get("paths", {})
         names = sorted({
