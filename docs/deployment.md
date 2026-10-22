@@ -18,7 +18,10 @@ and the `frontend/` folder. Do not add `.env`, API keys, or database passwords.
 ## 2. Prepare Supabase
 
 1. Create a Supabase project.
-2. In **SQL Editor**, run `supabase/analysis_history.sql`.
+2. In **SQL Editor**, run `supabase/analysis_history.sql` (including if you
+   already created the history table with an earlier app version). The script
+   removes older broad policies and creates per-user RLS; older rows without an
+   owner stay inaccessible rather than being shown to all accounts.
 3. In **Authentication → URL Configuration**, set the Site URL to the eventual
    Vercel domain. Add the Vercel preview/production callback URLs if email
    confirmation is enabled.
@@ -104,6 +107,12 @@ for a trusted local development connection when the server does not support it.
 5. From the administrator account, visit `/integrations` to check Vercel,
    Render, and Supabase status. Other signed-in users can access the workspace
    and chat but do not see the integrations navigation option.
+
+Analysis history is stored with the authenticated Supabase user ID, filtered
+by that ID in the backend, and protected by the `analysis_history` RLS policies.
+Use the Supabase project's **publishable key** (`sb_publishable_...`) or its
+legacy **anon** key in `SUPABASE_ANON_KEY`; keep the project URL and key from
+the same project. Never use a secret/service-role key for this setting.
 
 The interface limits datasets to about 2.9 MB for analysis requests. This
 leaves room for chat history and keeps the request below Render's 3 MB

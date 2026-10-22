@@ -66,6 +66,43 @@ def test_supabase_connector_rejects_service_role_key():
         })
 
 
+def test_supabase_publishable_key_is_sent_as_apikey(monkeypatch):
+    publishable_key = "sb_publishable_project-key"
+    request = Mock(return_value=_response(
+        200,
+        {"paths": {"/sales": {"get": {}}}},
+    ))
+    monkeypatch.setattr(connectors.requests, "get", request)
+
+    tables = list_tables({
+        "provider": "Supabase",
+        "url": "https://project.supabase.co",
+        "key": publishable_key,
+    })
+
+    assert [table.name for table in tables] == ["sales"]
+    assert request.call_args.kwargs["headers"]["apikey"] == publishable_key
+
+
+def test_supabase_rejected_key_error_mentions_supported_key_types(monkeypatch):
+    monkeypatch.setattr(
+        connectors.requests,
+        "get",
+        Mock(return_value=_response(401, {"message": "Invalid API key"})),
+    )
+
+    with pytest.raises(DatabaseConnectionError) as error:
+        list_tables({
+            "provider": "Supabase",
+            "url": "https://project.supabase.co",
+            "key": "sb_publishable_example",
+        })
+
+    assert "sb_publishable_" in str(error.value)
+    assert "same project's API Keys page" in str(error.value)
+    assert "Invalid API key" not in str(error.value)
+
+
 def test_production_database_connections_reject_private_networks(monkeypatch):
     monkeypatch.setattr(connectors.settings, "app_env", "production")
 
@@ -222,8 +259,8 @@ def test_supabase_request_errors_do_not_echo_credentials(monkeypatch):
 @pytest.mark.parametrize(
     ("status_code", "expected"),
     [
-        (401, "rejected the API key"),
-        (403, "denied Data API access"),
+        (401, "API Keys page"),
+        (403, "denied table discovery"),
         (404, "endpoint was not found"),
     ],
 )

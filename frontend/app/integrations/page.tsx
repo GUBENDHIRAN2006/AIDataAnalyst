@@ -101,7 +101,7 @@ export default function IntegrationsPage() {
                 <div className="eyebrow">Accounts and history</div>
                 <h2>Supabase</h2>
                 <p className="muted">FastAPI uses your Supabase project for email authentication and per-user saved analysis history.</p>
-                <p className="small">Run <code>supabase/analysis_history.sql</code> in the Supabase SQL Editor. Keep RLS enabled and use only the anon/publishable key, never the service-role secret.</p>
+                <p className="small">Run <code>supabase/analysis_history.sql</code> in the Supabase SQL Editor after updates too. It enforces per-user history RLS. Use only a publishable or legacy anon key, never the secret/service-role key.</p>
               </article>
             </section>
             <div className="actions"><Link className="button" href="/">Back to workspace</Link></div>

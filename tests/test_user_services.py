@@ -97,6 +97,11 @@ def test_expired_access_token_is_refreshed_and_history_is_user_scoped(monkeypatc
                 200,
                 {"access_token": "new-access", "refresh_token": "new-refresh"},
             )
+        if url.endswith("/auth/v1/user"):
+            return _response(
+                200,
+                {"id": "user-123", "email": "one@example.com"},
+            )
         return _response(200, [{"id": "entry-1"}])
 
     monkeypatch.setattr("user_services.requests.request", request)
@@ -113,11 +118,14 @@ def test_expired_access_token_is_refreshed_and_history_is_user_scoped(monkeypatc
     assert service.access_token == "new-access"
     assert service.refresh_token == "new-refresh"
     assert calls[-1][2]["headers"]["Authorization"] == "Bearer new-access"
-    assert "user_id" not in calls[-1][2].get("params", {})
+    assert calls[-1][2]["params"]["user_id"] == "eq.user-123"
 
 
-def test_history_insert_uses_authenticated_token_and_only_question_answer(monkeypatch):
-    request = Mock(return_value=_response(201, {}))
+def test_history_insert_sets_verified_user_id_and_uses_authenticated_token(monkeypatch):
+    request = Mock(side_effect=[
+        _response(200, {"id": "user-123", "email": "one@example.com"}),
+        _response(201, {}),
+    ])
     monkeypatch.setattr("user_services.requests.request", request)
     service = SupabaseUserService(
         "https://project.supabase.co", "anon-key", "user-access", "user-refresh"
@@ -125,11 +133,12 @@ def test_history_insert_uses_authenticated_token_and_only_question_answer(monkey
 
     service.save_history("Revenue total", "What is revenue?", "Total is 42.")
 
-    args, kwargs = request.call_args
+    args, kwargs = request.call_args_list[-1]
     assert args[0] == "POST"
     assert args[1].endswith("/rest/v1/analysis_history")
     assert kwargs["headers"]["Authorization"] == "Bearer user-access"
     assert kwargs["json"] == {
+        "user_id": "user-123",
         "title": "Revenue total",
         "question": "What is revenue?",
         "answer": "Total is 42.",

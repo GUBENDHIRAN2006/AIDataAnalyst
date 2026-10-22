@@ -270,7 +270,7 @@ export default function Dashboard() {
               ) : (
                 <>
                   <div className="field full"><label>Supabase project URL</label><input required value={String(connection.url ?? "")} onChange={(event) => setField("url", event.target.value)} placeholder="https://your-project.supabase.co" /></div>
-                  <div className="field full"><label>Anon / publishable API key</label><input required type="password" value={String(connection.key ?? "")} onChange={(event) => setField("key", event.target.value)} /></div>
+                  <div className="field full"><label>Publishable key or legacy anon key</label><input required type="password" value={String(connection.key ?? "")} onChange={(event) => setField("key", event.target.value)} /></div>
                   <div className="field full"><label>Optional user access token</label><input type="password" value={String(connection.access_token ?? "")} onChange={(event) => setField("access_token", event.target.value)} /></div>
                 </>
               )}

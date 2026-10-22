@@ -159,26 +159,31 @@ class SupabaseUserService:
         }
 
     def list_history(self, limit: int = 50) -> list[dict[str, Any]]:
-        query = (
-            "?select=id,title,question,answer,created_at"
-            f"&order=created_at.desc&limit={max(1, min(limit, 100))}"
-        )
+        user = self.get_user()
         result = self._request(
             "GET",
-            f"/rest/v1/analysis_history{query}",
+            "/rest/v1/analysis_history",
             authenticated=True,
+            params={
+                "select": "id,title,question,answer,created_at",
+                "order": "created_at.desc",
+                "limit": max(1, min(limit, 100)),
+                "user_id": f"eq.{user['id']}",
+            },
         )
         if not isinstance(result, list):
             raise UserServiceError("The history service returned an invalid response.")
         return result
 
     def save_history(self, title: str, question: str, answer: str) -> None:
+        user = self.get_user()
         self._request(
             "POST",
             "/rest/v1/analysis_history",
             authenticated=True,
             headers={"Prefer": "return=minimal"},
             json={
+                "user_id": user["id"],
                 "title": title[:120],
                 "question": question[:4000],
                 "answer": answer[:12000],

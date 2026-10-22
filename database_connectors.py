@@ -462,6 +462,31 @@ def _supabase_headers(key: str, access_token: str = "") -> dict[str, str]:
     return headers
 
 
+def _supabase_error_detail(status_code: int, operation: str) -> str:
+    if status_code == 401:
+        return (
+            "Supabase rejected the API key (HTTP 401). Copy the project's "
+            "publishable key (`sb_publishable_…`) or legacy anon key from the "
+            "same project's API Keys page, and pair it with that project's "
+            "HTTPS URL. Secret/service-role keys are not accepted here."
+        )
+    if status_code == 403:
+        return (
+            f"Supabase denied {operation} (HTTP 403). Check that the Data API is "
+            "enabled, the table schema is exposed, and the provided user access "
+            "token or anon role has SELECT permission under RLS."
+        )
+    if status_code == 404:
+        return (
+            f"Supabase {operation} endpoint was not found (HTTP 404). Confirm the "
+            "project URL and that the Data API is enabled."
+        )
+    return (
+        f"Supabase {operation} failed (HTTP {status_code}). "
+        "Check the project status and Data API settings."
+    )
+
+
 def _supabase_tables(config: Mapping[str, Any]) -> list[TableRef]:
     base_url = _supabase_base_url(config)
     key = str(config["key"]).strip()
@@ -477,29 +502,8 @@ def _supabase_tables(config: Mapping[str, Any]) -> list[TableRef]:
             timeout=10,
         )
         if response.status_code >= 400:
-            if response.status_code == 401:
-                detail = (
-                    "Supabase rejected the API key. Confirm the project URL and "
-                    "anon/publishable key are from the same project."
-                )
-            elif response.status_code == 403:
-                detail = (
-                    "Supabase denied Data API access. Expose the table's schema, "
-                    "grant SELECT to the key's role, and check its row-level security "
-                    "policy. For user-restricted tables, provide a valid user access token."
-                )
-            elif response.status_code == 404:
-                detail = (
-                    "Supabase Data API endpoint was not found. Check the project URL "
-                    "and enable the Data API for this project."
-                )
-            else:
-                detail = (
-                    f"Supabase Data API returned HTTP {response.status_code}. "
-                    "Check the project status and Data API settings."
-                )
             raise DatabaseConnectionError(
-                detail
+                _supabase_error_detail(response.status_code, "table discovery")
             )
         paths = response.json().get("paths", {})
         names = sorted({
@@ -542,8 +546,7 @@ def _read_supabase_table(
         )
         if response.status_code >= 400:
             raise DatabaseConnectionError(
-                "Supabase could not read this table. Check the table name, Data API "
-                "access, and row-level security policy."
+                _supabase_error_detail(response.status_code, "table read")
             )
         rows = response.json()
         if not isinstance(rows, list):
