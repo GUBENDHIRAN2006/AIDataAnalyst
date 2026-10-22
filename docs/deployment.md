@@ -36,6 +36,9 @@ and the `frontend/` folder. Do not add `.env`, API keys, or database passwords.
    Render reads `render.yaml` and creates the `ai-data-analyst-api` service.
 3. In the service's environment settings, fill in `GROQ_API_KEY`,
    `SUPABASE_URL`, and `SUPABASE_ANON_KEY`.
+   The blueprint caps Groq responses at 1,024 output tokens by default to
+   reduce tokens-per-minute usage. Increase `GROQ_MAX_TOKENS` only if your
+   Groq plan has enough TPM capacity.
 4. Deploy and wait for the health check. Open
    `https://<your-render-service>.onrender.com/health`; it should return
    `{"status":"ok"}`.
@@ -86,6 +89,9 @@ private object storage rather than raising this limit.
   databases. Avoid service-role credentials for user database connections.
 - Render free instances may sleep when idle. The first request after idle can
   take longer; use an always-on plan for latency-sensitive production use.
+- Groq 429 rate-limit responses mean the model or organization quota was
+  exceeded. Wait for the TPM window to reset; lower `GROQ_MAX_TOKENS` or use a
+  Groq plan/model with higher limits if the issue continues.
 - This repository does not include the user's provider credentials and cannot
   create services or deploy on their accounts. The steps above complete
   deployment after those values and the GitHub repository are supplied.

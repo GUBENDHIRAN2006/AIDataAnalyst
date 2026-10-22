@@ -448,7 +448,7 @@ This generates a full report in `docs/evaluation_report.md`.
 |----------|---------|-------------|
 | `GROQ_API_KEY` | — | **Required for AI chat.** Your Groq API key |
 | `GROQ_MODEL` | `openai/gpt-oss-120b` | Groq-hosted model name |
-| `GROQ_MAX_TOKENS` | `4096` | Max tokens per response |
+| `GROQ_MAX_TOKENS` | `1024` | Max output tokens per response; lower values reduce TPM usage |
 | `MAX_UPLOAD_SIZE_MB` | `50` | Max CSV upload size |
 | `MAX_ROWS` | `500000` | Max dataset rows |
 | `MAX_COLUMNS` | `200` | Max dataset columns |

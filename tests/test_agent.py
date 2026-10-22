@@ -41,7 +41,7 @@ def _settings(**overrides):
         "groq_api_key": "test-groq-key",
         "has_groq_key": True,
         "groq_model": "openai/gpt-oss-120b",
-        "groq_max_tokens": 4096,
+        "groq_max_tokens": 1024,
         "api_timeout_seconds": 60,
         "max_tool_calls": 10,
         "max_result_rows": 1000,
@@ -120,6 +120,7 @@ class TestGroqConfiguration:
         settings = Settings(_env_file=None, groq_api_key="test-groq-key")
         assert settings.has_groq_key
         assert settings.groq_model == "openai/gpt-oss-120b"
+        assert settings.groq_max_tokens == 1024
         assert settings.safe_summary()["api_key_configured"]
 
     def test_missing_groq_key_is_reported(self):
@@ -151,6 +152,7 @@ class TestGroqRequest:
             "role": "system",
             "content": "system prompt",
         }
+        assert kwargs["json"]["max_tokens"] == mock_settings.groq_max_tokens
         assert kwargs["json"]["tools"][0]["type"] == "function"
 
     def test_api_error_is_reported_without_suppressing_it(self):
@@ -243,3 +245,18 @@ class TestRunAgent:
 
         assert result.error is not None
         assert secret not in result.error
+
+    def test_tpm_rate_limit_has_actionable_message(self, dataset_info):
+        response = _api_response(
+            {"error": {"message": "Rate limit reached for tokens per minute"}},
+            429,
+        )
+
+        with patch.object(agent, "settings", _settings()), \
+             patch("agent.requests.post", return_value=response):
+            result = run_agent("How many rows?", dataset_info)
+
+        assert result.error is not None
+        assert "rate limit reached" in result.error.lower()
+        assert "wait about a minute" in result.error.lower()
+        assert "1024 output tokens" in result.error

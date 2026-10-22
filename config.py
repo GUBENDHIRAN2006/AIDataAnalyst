@@ -42,7 +42,7 @@ class Settings(BaseSettings):
         description="Groq-hosted model name.",
     )
     groq_max_tokens: int = Field(
-        default=4096,
+        default=1024,
         ge=256,
         le=32768,
         description="Maximum output tokens per response.",

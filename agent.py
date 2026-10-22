@@ -746,6 +746,13 @@ def run_agent(
                 "❌ Invalid API key. Check GROQ_API_KEY in your .env file. "
                 "Get a key at: https://console.groq.com/keys"
             )
+        elif "429" in lowered or "rate limit" in lowered or "tokens per minute" in lowered:
+            response.error = (
+                "❌ Groq rate limit reached. Wait about a minute for the quota window "
+                "to reset, then retry. The app limits each response to "
+                f"{settings.groq_max_tokens} output tokens; lower GROQ_MAX_TOKENS "
+                "further or use a model/account with a higher TPM limit if this persists."
+            )
         else:
             response.error = f"❌ Groq API error: {err_str[:200]}"
     except Exception as exc:
