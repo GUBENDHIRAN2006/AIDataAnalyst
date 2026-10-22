@@ -29,14 +29,17 @@ and the `frontend/` folder. Do not add `.env`, API keys, or database passwords.
 
 ## 3. Deploy FastAPI on Render
 
-1. In Render, choose **New → Blueprint** and select the GitHub repository.
+1. The repository pins Render to Python 3.12 using `.python-version`.
+   This avoids the Python 3.14 source build failure for the project's pinned
+   Pydantic Core dependency.
+2. In Render, choose **New → Blueprint** and select the GitHub repository.
    Render reads `render.yaml` and creates the `ai-data-analyst-api` service.
-2. In the service's environment settings, fill in `GROQ_API_KEY`,
+3. In the service's environment settings, fill in `GROQ_API_KEY`,
    `SUPABASE_URL`, and `SUPABASE_ANON_KEY`.
-3. Deploy and wait for the health check. Open
+4. Deploy and wait for the health check. Open
    `https://<your-render-service>.onrender.com/health`; it should return
    `{"status":"ok"}`.
-4. Copy the generated `APP_API_KEY` value from Render's environment settings.
+5. Copy the generated `APP_API_KEY` value from Render's environment settings.
    Treat it as a secret.
 
 ## 4. Deploy Next.js on Vercel
