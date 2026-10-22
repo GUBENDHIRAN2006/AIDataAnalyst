@@ -83,10 +83,19 @@ class HistoryPayload(BaseModel):
     answer: str = Field(min_length=1, max_length=12000)
 
 
+class ConversationMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class AnalysisPayload(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     records: list[dict] = Field(min_length=1, max_length=500000)
     filename: str = Field(default="imported-data.csv", min_length=1, max_length=255)
+    conversation_history: list[ConversationMessage] = Field(
+        default_factory=list,
+        max_length=6,
+    )
 
 
 def require_internal_api_key(
@@ -359,7 +368,14 @@ def analyze_records(
             file_format="database",
             file_size_bytes=len(serialized_records.encode("utf-8")),
         )
-        result = run_agent(payload.question, dataset)
+        result = run_agent(
+            payload.question,
+            dataset,
+            conversation_history=[
+                message.model_dump()
+                for message in payload.conversation_history
+            ],
+        )
         response = result.to_dict()
         if authorization and authorization.startswith("Bearer ") and response.get("answer"):
             service = _supabase_user_service(

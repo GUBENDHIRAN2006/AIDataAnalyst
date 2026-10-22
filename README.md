@@ -29,6 +29,7 @@ Analysing a new dataset manually requires coding knowledge and hours of work. **
 | 🔌 Database Imports | Read-only imports from PostgreSQL, MySQL, MongoDB, and Supabase |
 | 📊 Data Explorer | Preview, profile, column stats, and missing-value analysis |
 | 💬 AI Chat | Multi-turn natural-language Q&A with conversation history |
+| 📈 Chat Results | Dedicated chat page with text answers, result tables, and responsive charts |
 | 👤 Optional Accounts | Use without signing in, or register/sign in with Supabase Auth |
 | 🕘 Saved History | Signed-in users can view their saved questions and answers |
 | 🌙 Dark Mode | Toggle the app theme from the sidebar |
@@ -66,7 +67,7 @@ graph TD
     Streamlit["🧪 Existing local Streamlit UI (app.py)"] -. optional local UI .-> FastAPI
 ```
 
-**Security boundary:** The full dataset is not uploaded to Groq; the agent sends schema details and deterministic analysis-tool results needed to answer each question. Depending on the selected analysis tool, those results can include matching row values or category labels. Do not analyze information you are not authorized to send to the configured Groq service. Database connections only execute app-generated, read-only imports; arbitrary SQL is not accepted. In the Next.js frontend, database credentials stay in component memory and are sent through a same-origin server proxy to FastAPI; the Render API key is never exposed to the browser. Signed-in history stores questions and answers in the user's Supabase project and is protected with row-level security.
+**Security boundary:** The full dataset is not uploaded to Groq; the agent sends schema details and deterministic analysis-tool results needed to answer each question. Depending on the selected analysis tool, those results can include matching row values or category labels. Do not analyze information you are not authorized to send to the configured Groq service. Database connections only execute app-generated, read-only imports; arbitrary SQL is not accepted. In the Next.js frontend, imported data and the active chat are kept in browser-local IndexedDB so they survive navigation and refresh; clear the workspace on shared devices. Database credentials stay in component memory and are sent through a same-origin server proxy to FastAPI; the Render API key is never exposed to the browser. Signed-in history stores questions and answers in the user's Supabase project and is protected with row-level security.
 
 ---
 
@@ -111,6 +112,9 @@ ai-data-analyst/
 ├── render.yaml             # Render FastAPI Blueprint
 ├── docs/deployment.md      # Vercel + Render + Supabase instructions
 ├── frontend/               # Vercel Next.js UI and server-side API proxy
+│   ├── app/chat/            # Dedicated multi-turn analysis page
+│   ├── components/analysis-output.tsx # Text, table, and chart results
+│   └── lib/workspace.ts     # Browser-local IndexedDB dataset and chat
 ├── assets/brand.svg         # Shared application logo
 ├── README.md               # This file
 │

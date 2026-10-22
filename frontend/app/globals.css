@@ -92,6 +92,51 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
 th { background: #f7f8fc; position: sticky; top: 0; color: #506079; }
 .answer { white-space: pre-wrap; line-height: 1.7; margin-top: 14px; }
+.chat-page { width: min(1440px, calc(100% - 36px)); }
+.chat-hero { align-items: center; }
+.chat-layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; align-items: start; gap: 20px; }
+.chat-card { min-width: 0; padding: 0; overflow: hidden; }
+.chat-thread { height: min(66vh, 760px); min-height: 360px; overflow: auto; padding: 24px; }
+.chat-empty { max-width: 680px; margin: 12vh auto; text-align: center; }
+.chat-empty h2 { margin-bottom: 12px; }
+.suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; margin-top: 22px; }
+.chat-message { max-width: 100%; margin: 0 0 22px; }
+.chat-message.user { display: grid; justify-items: end; }
+.chat-role { margin-bottom: 7px; color: var(--muted); font-size: 12px; font-weight: 800; }
+.chat-user-text { max-width: min(78%, 720px); padding: 12px 15px; border-radius: 16px 16px 4px 16px; background: #eeedff; color: var(--ink); line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
+.analysis-output { max-width: 100%; overflow-wrap: anywhere; }
+.answer-text { line-height: 1.75; white-space: pre-wrap; }
+.result-block { margin-top: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.result-block h4 { margin: 0 0 12px; font: 700 14px Manrope, sans-serif; }
+.result-table-wrap, .chart-scroll { max-width: 100%; overflow: auto; }
+.result-table { min-width: 420px; font-size: 12px; }
+.result-table th { position: static; }
+.series-chart { display: block; width: 100%; min-width: 560px; max-height: 360px; }
+.heatmap-chart { display: block; max-width: 100%; min-width: 340px; }
+.chart-gridline { stroke: var(--line); stroke-width: 1; }
+.chart-label { fill: var(--muted); font: 11px "DM Sans", sans-serif; }
+.chart-axis-title { fill: var(--ink); font: 11px "DM Sans", sans-serif; }
+.chart-bar { fill: #5146e5; }
+.chart-line { fill: none; stroke: #5146e5; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.chart-point { fill: #5146e5; stroke: var(--surface); stroke-width: 2; }
+.heatmap-value { fill: var(--ink); font: 10px "DM Sans", sans-serif; }
+.message-warnings { margin-top: 12px; color: #8a4b12; font-size: 13px; }
+.message-warnings ul { padding-left: 20px; }
+.chat-typing { padding: 12px; color: var(--muted); font-size: 13px; }
+.chat-composer { padding: 18px 22px; border-top: 1px solid var(--line); background: var(--surface); }
+.composer-row { display: flex; align-items: flex-end; gap: 12px; margin-top: 8px; }
+.composer-row textarea { resize: vertical; min-height: 72px; max-height: 220px; }
+.composer-row .button { min-height: 46px; }
+.chat-composer .small { margin: 7px 0 0; }
+.chat-sidebar { display: grid; gap: 16px; min-width: 0; }
+.chat-sidebar .card { padding: 18px; }
+.chat-sidebar h2 { margin-top: 6px; font-size: 20px; }
+.preview-table { max-height: 250px; }
+.preview-table table { font-size: 11px; }
+.saved-history-item { padding: 10px 0; border-top: 1px solid var(--line); }
+.saved-history-item summary { cursor: pointer; font-weight: 700; overflow-wrap: anywhere; }
+.saved-history-item p { margin: 8px 0 0; }
+.notice.error { overflow-wrap: anywhere; }
 .auth-wrap { min-height: calc(100vh - 76px); display: grid; place-items: center; padding: 28px 18px; }
 .auth-card { width: min(460px, 100%); padding: 34px; }
 .auth-card .form-grid { grid-template-columns: 1fr; }
@@ -107,6 +152,12 @@ th { background: #f7f8fc; position: sticky; top: 0; color: #506079; }
   .page { margin-top: 28px; }
   .hero { align-items: flex-start; flex-direction: column; }
   .span-8, .span-4 { grid-column: span 12; }
+  .chat-layout { grid-template-columns: minmax(0, 1fr); }
+  .chat-thread { height: 58vh; min-height: 320px; padding: 16px; }
+  .composer-row { align-items: stretch; flex-direction: column; }
+  .composer-row .button { align-self: flex-end; }
+  .chat-user-text { max-width: 92%; }
+  .chat-sidebar { grid-template-columns: 1fr; }
   .provider-grid { grid-template-columns: repeat(2, 1fr); }
   .form-grid { grid-template-columns: 1fr; }
   .field.full { grid-column: auto; }

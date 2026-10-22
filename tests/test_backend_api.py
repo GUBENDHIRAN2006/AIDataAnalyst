@@ -173,8 +173,8 @@ def test_analysis_endpoint_validates_records_and_returns_agent_result(monkeypatc
         to_dict=Mock(
             return_value={
                 "answer": "Total revenue is 100.",
-                "tables": [],
-                "charts": [],
+                "tables": [{"title": "Revenue", "data": [{"total": 100}]}],
+                "charts": [{"chart_type": "bar", "x_values": ["A"], "y_values": [100]}],
                 "warnings": [],
                 "error": None,
             }
@@ -190,14 +190,31 @@ def test_analysis_endpoint_validates_records_and_returns_agent_result(monkeypatc
             "question": "What is total revenue?",
             "filename": "sales.csv",
             "records": [{"revenue": 100}],
+            "conversation_history": [
+                {"role": "user", "content": "Show the sales table."},
+                {"role": "assistant", "content": "The table is displayed."},
+            ],
         },
     )
 
     assert response.status_code == 200
     assert response.json()["answer"] == "Total revenue is 100."
+    assert response.json()["tables"] == [
+        {"title": "Revenue", "data": [{"total": 100}]}
+    ]
+    assert response.json()["charts"] == [
+        {"chart_type": "bar", "x_values": ["A"], "y_values": [100]}
+    ]
     assert "access_token" not in response.json()
     assert "refresh_token" not in response.json()
-    agent.assert_called_once_with("What is total revenue?", dataset)
+    agent.assert_called_once_with(
+        "What is total revenue?",
+        dataset,
+        conversation_history=[
+            {"role": "user", "content": "Show the sales table."},
+            {"role": "assistant", "content": "The table is displayed."},
+        ],
+    )
 
 
 def test_analysis_endpoint_enforces_dataset_transfer_limit(monkeypatch):

@@ -645,7 +645,12 @@ def run_agent(
             messages.append(assistant_message)
 
             if not tool_calls:
-                response.answer = assistant_message.get("content") or "Analysis complete."
+                response.answer = assistant_message.get("content") or ""
+                if not response.answer:
+                    response.error = (
+                        "The AI returned no text answer. Any calculated tables or "
+                        "charts are shown below; please try rephrasing your question."
+                    )
                 break
 
             for tool_call in tool_calls:

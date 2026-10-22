@@ -199,6 +199,42 @@ class TestRunAgent:
         assert sent_messages[-1]["role"] == "tool"
         assert sent_messages[-1]["tool_call_id"] == "call-1"
 
+    def test_tool_call_history_is_used_for_follow_up(self, dataset_info):
+        response = _api_response(_assistant_response(content="The answer is 12."))
+
+        with patch.object(agent, "settings", _settings()), \
+             patch("agent.requests.post", return_value=response) as post:
+            result = run_agent(
+                "What about Finland?",
+                dataset_info,
+                conversation_history=[
+                    {"role": "user", "content": "Show total sales."},
+                    {"role": "assistant", "content": "Total sales are 100."},
+                ],
+            )
+
+        assert result.answer == "The answer is 12."
+        sent_messages = post.call_args.kwargs["json"]["messages"]
+        assert sent_messages[1:3] == [
+            {"role": "user", "content": "Show total sales."},
+            {"role": "assistant", "content": "Total sales are 100."},
+        ]
+        assert sent_messages[-1] == {
+            "role": "user",
+            "content": "What about Finland?",
+        }
+
+    def test_empty_final_response_is_not_reported_as_success(self, dataset_info):
+        response = _api_response(_assistant_response(content=""))
+
+        with patch.object(agent, "settings", _settings()), \
+             patch("agent.requests.post", return_value=response):
+            result = run_agent("Summarize the dataset.", dataset_info)
+
+        assert result.answer == ""
+        assert result.error is not None
+        assert "no text answer" in result.error.lower()
+
     def test_tool_calls_never_exceed_configured_limit(self, dataset_info):
         response = _api_response(_assistant_response(
             tool_calls=[

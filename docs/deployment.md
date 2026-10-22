@@ -76,14 +76,19 @@ to sensitive tables just to make discovery work.
 2. If email confirmation is enabled, confirm the message sent by Supabase and
    then sign in.
 3. Import a small CSV or connect a read-only database and choose a table.
-4. Ask a question. Signed-in users can load the saved history from the
-   workspace.
+4. Review the preview and click **Start analysis in chat**. Ask questions and
+   follow-ups; text, result tables, and supported charts appear in the chat.
+   Signed-in users can view saved history on the chat page.
 5. Visit `/integrations` to check Vercel, Render, and Supabase status.
 
-The Vercel integration currently limits data passed through its server route
-to about 3.5 MB per request. Use a smaller table for large datasets; larger
-production data flows should be redesigned around paginated queries or
-private object storage rather than raising this limit.
+The interface limits datasets to about 2.9 MB for analysis requests. This
+leaves room for chat history and keeps the request below Render's 3 MB
+backend limit. Use smaller tables; larger production data flows should be
+redesigned around paginated queries or private object storage rather than
+raising this limit.
+The active dataset and chat transcript are stored in browser-local IndexedDB
+so navigation and refresh do not discard the session. Clear the workspace on
+shared devices.
 
 ## Important security and runtime notes
 

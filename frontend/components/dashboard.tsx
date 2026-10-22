@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Papa from "papaparse";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { RecordRow, writeWorkspace } from "@/lib/workspace";
 
 type Provider = "PostgreSQL" | "MySQL" | "MongoDB" | "Supabase";
 type TableRef = { name: string; schema?: string | null };
-type RecordRow = Record<string, unknown>;
 type Account = { authenticated: boolean; email: string };
-type HistoryItem = { id: string; title: string; question: string; answer: string; created_at: string };
 
 const providers: Provider[] = ["PostgreSQL", "MySQL", "MongoDB", "Supabase"];
-const MAX_WEB_DATA_BYTES = 3_500_000;
+const MAX_WEB_DATA_BYTES = 2_900_000;
 
 async function requestJson(path: string, init?: RequestInit) {
   const response = await fetch(path, {
@@ -24,6 +24,7 @@ async function requestJson(path: string, init?: RequestInit) {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [account, setAccount] = useState<Account>({ authenticated: false, email: "" });
   const [provider, setProvider] = useState<Provider>("PostgreSQL");
   const [connection, setConnection] = useState<Record<string, string | number | boolean>>({});
@@ -31,9 +32,6 @@ export default function Dashboard() {
   const [selectedTable, setSelectedTable] = useState("");
   const [records, setRecords] = useState<RecordRow[]>([]);
   const [filename, setFilename] = useState("");
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
-  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -97,7 +95,6 @@ export default function Dashboard() {
       }
       setRecords(rowData);
       setFilename(String(result.filename ?? table.name));
-      setAnswer("");
       setNotice(`Imported ${rowData.length.toLocaleString()} rows.`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not import this table.");
@@ -112,7 +109,7 @@ export default function Dashboard() {
     setError("");
     setNotice("");
     if (file.size > MAX_WEB_DATA_BYTES) {
-      setError("Choose a CSV up to 3.5 MB for this Vercel-powered interface.");
+      setError("Choose a CSV up to 2.9 MB for this deployment.");
       event.target.value = "";
       return;
     }
@@ -131,45 +128,23 @@ export default function Dashboard() {
         }
         setRecords(result.data);
         setFilename(file.name);
-        setAnswer("");
         setNotice(`Loaded ${result.data.length.toLocaleString()} rows from ${file.name}.`);
       },
       error: (reason) => setError(reason.message),
     });
   }
 
-  async function analyze(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    setNotice("");
+  async function startAnalysis() {
     try {
-      const size = new TextEncoder().encode(JSON.stringify(records)).byteLength;
+      const serializedRecords = JSON.stringify(records);
+      const size = new TextEncoder().encode(serializedRecords).byteLength;
       if (size > MAX_WEB_DATA_BYTES) {
         throw new Error("This dataset is too large for Vercel. Select a smaller table.");
       }
-      const result = await requestJson("/api/backend/api/analyze", {
-        method: "POST",
-        body: JSON.stringify({ question, records, filename }),
-      });
-      if (result.error) throw new Error(result.error);
-      setAnswer(String(result.answer ?? "Analysis finished."));
-      setNotice("Analysis complete.");
-      if (account.authenticated) await loadHistory();
+      await writeWorkspace({ filename, records, messages: [] });
+      router.push("/chat");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Analysis failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function loadHistory() {
-    if (!account.authenticated) return;
-    try {
-      const result = await requestJson("/api/backend/api/history");
-      setHistory(result.items as HistoryItem[]);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not load saved history.");
+      setError(reason instanceof Error ? reason.message : "Could not start the analysis workspace.");
     }
   }
 
@@ -178,7 +153,6 @@ export default function Dashboard() {
     try {
       await requestJson("/api/auth/logout", { method: "POST" });
       setAccount({ authenticated: false, email: "" });
-      setHistory([]);
       setNotice("Signed out.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Sign out failed.");
@@ -275,7 +249,7 @@ export default function Dashboard() {
               </div>
             )}
             <div className="notice">
-              Use read-only credentials and trusted databases only. Avoid service-role keys. Vercel requests are limited to datasets around 3.5 MB in this starter integration.
+              Use read-only credentials and trusted databases only. Avoid service-role keys. This deployment limits datasets to about 2.9 MB so analysis requests fit the backend payload limit.
             </div>
           </article>
 
@@ -284,55 +258,33 @@ export default function Dashboard() {
             <h2>Upload a CSV</h2>
             <p className="muted">CSV files are parsed locally in your browser before analysis.</p>
             <div className="field" style={{ marginTop: 18 }}>
-              <label htmlFor="csv-file">CSV file (up to 3.5 MB)</label>
+              <label htmlFor="csv-file">CSV file (up to 2.9 MB)</label>
               <input id="csv-file" type="file" accept=".csv,text/csv" onChange={loadCsv} />
             </div>
           </article>
 
-          <article className="card span-8">
+          <article className="card span-12">
             <div className="row">
-              <div><div className="eyebrow">Step 2</div><h2>Ask about your data</h2></div>
-              <span className="small">{records.length.toLocaleString()} rows · {columns.length} columns</span>
+              <div><div className="eyebrow">Step 2</div><h2>Review your loaded data</h2></div>
+              {records.length > 0 && <span className="small">{records.length.toLocaleString()} rows · {columns.length} columns</span>}
             </div>
             {records.length ? (
               <>
                 <div className="table-wrap">
                   <table>
-                    <thead><tr>{columns.slice(0, 10).map((column) => <th key={column}>{column}</th>)}</tr></thead>
-                    <tbody>{records.slice(0, 8).map((row, index) => <tr key={index}>{columns.slice(0, 10).map((column) => <td key={column}>{String(row[column] ?? "")}</td>)}</tr>)}</tbody>
+                    <thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead>
+                    <tbody>{records.slice(0, 10).map((row, index) => <tr key={index}>{columns.map((column) => <td key={column}>{String(row[column] ?? "")}</td>)}</tr>)}</tbody>
                   </table>
                 </div>
-                <form onSubmit={analyze}>
-                  <div className="field" style={{ marginTop: 18 }}>
-                    <label htmlFor="question">Your question</label>
-                    <textarea id="question" required rows={3} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What are the main trends in this dataset?" />
-                  </div>
-                  <div className="actions"><button className="button" disabled={busy || !question.trim()} type="submit">{busy ? "Analyzing…" : "Analyze data"}</button></div>
-                </form>
-                {answer && <div className="answer">{answer}</div>}
+                <div className="actions">
+                  <button className="button" disabled={busy} onClick={startAnalysis} type="button">
+                    Start analysis in chat
+                  </button>
+                  <span className="small">Continue with follow-up questions, charts, and result tables on the chat page.</span>
+                </div>
               </>
             ) : (
-              <p className="muted" style={{ marginTop: 20 }}>Connect a database or upload a CSV to preview rows and start analysis.</p>
-            )}
-          </article>
-
-          <article className="card span-4">
-            <div className="row">
-              <div><div className="eyebrow">Your account</div><h2>Analysis history</h2></div>
-            </div>
-            {account.authenticated ? (
-              <>
-                <button className="button-secondary" style={{ marginTop: 16 }} onClick={loadHistory}>Load saved history</button>
-                {history.map((item) => (
-                  <details key={item.id} style={{ marginTop: 13 }}>
-                    <summary style={{ cursor: "pointer", fontWeight: 700 }}>{item.title}</summary>
-                    <p className="small">{item.question}</p>
-                    <p className="small">{item.answer}</p>
-                  </details>
-                ))}
-              </>
-            ) : (
-              <p className="muted" style={{ marginTop: 14 }}>Use as a guest, or <Link href="/login" style={{ color: "var(--brand)", fontWeight: 700 }}>sign in</Link> to save analysis history.</p>
+              <p className="muted" style={{ marginTop: 20 }}>Connect a database table or upload a CSV. Its preview will appear here before you start a chat.</p>
             )}
           </article>
         </section>

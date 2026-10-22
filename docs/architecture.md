@@ -39,7 +39,8 @@ graph TD
 | `user_services.py` | Supabase email/password auth and user-scoped history |
 | `backend_api.py` | Internal FastAPI boundary for auth, history, and database operations |
 | `backend_client.py` | Streamlit server-side client for the internal API |
-| `frontend/` | Vercel Next.js UI and same-origin API proxy; keeps the backend key server-side |
+| `frontend/` | Vercel Next.js workspace, multi-turn chat, result visualizations, and same-origin API proxy |
+| `frontend/lib/workspace.ts` | Browser-local IndexedDB storage for the active dataset and conversation |
 | `render.yaml` | Render FastAPI service blueprint |
 | `config.py` | Pydantic Settings, environment variables |
 | `evaluation.py` | Benchmark framework, metrics collection |
@@ -80,9 +81,9 @@ graph TD
 7. **Account isolation**: Supabase history is protected by per-user row-level security; no service-role key is accepted. Supabase/database calls run in FastAPI.
 8. **Bounded execution**: Maximum tool calls, row limits, timeouts, and result size limits are enforced.
 9. **Secret isolation**: API keys and passwords are never rendered in plain text or returned to the UI.
-10. **Session isolation**: Auth tokens are held in HTTP-only cookies; datasets are held in the active browser state and are not persisted.
+10. **Session isolation**: Auth tokens are held in HTTP-only cookies; the active dataset and chat are stored in browser-local IndexedDB to survive navigation and refresh. Users should clear the workspace on shared devices.
 11. **Internal API**: FastAPI requires a constant-time-checked shared key on operational routes. Vercel route handlers add the key server-side, and it is never exposed as a public frontend variable.
-12. **Payload bounds**: The Vercel server proxy caps JSON request payloads at 3.5 MB; Render also validates rows, columns, and transfer size.
+12. **Payload bounds**: The Vercel proxy caps JSON requests at 3.5 MB, while the UI limits datasets to about 2.9 MB to leave room for conversation context and keep requests below Render's 3 MB limit.
 
 The agent sends selected tool results to Groq, so those results may contain
 values needed for the requested analysis. Supabase history stores questions and
