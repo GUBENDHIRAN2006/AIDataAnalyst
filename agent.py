@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from typing import Any, Optional
 
@@ -565,6 +566,113 @@ Rules:
 """
 
 
+def _is_chart_request(question: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(chart|plot|graph|visuali[sz](?:e|ation)|histogram|heatmap)\b",
+            question,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def _make_requested_chart(question: str, df: pd.DataFrame) -> dict:
+    lowered_question = question.casefold()
+    columns = [str(column) for column in df.columns]
+    if re.search(r"\b(pie|donut|doughnut|area)\b", lowered_question):
+        raise ToolError(
+            "Supported charts are bar, line, scatter, histogram, and heatmap."
+        )
+    numeric_columns = [
+        str(column)
+        for column in df.select_dtypes(include="number").columns
+    ]
+    category_columns = [
+        str(column)
+        for column in df.select_dtypes(exclude="number").columns
+    ]
+
+    def mentioned(candidates: list[str]) -> str | None:
+        for column in candidates:
+            if re.search(
+                rf"(?<!\w){re.escape(column.casefold())}(?!\w)",
+                lowered_question,
+            ):
+                return column
+        return None
+
+    if any(term in lowered_question for term in ("heatmap", "correlation matrix", "correlation chart")):
+        chart = make_chart_data(df, "heatmap", columns[0])
+        chart["title"] = "Correlation heatmap"
+        return chart
+
+    mentioned_numeric = mentioned(numeric_columns)
+    if "histogram" in lowered_question or "distribution" in lowered_question:
+        if not numeric_columns:
+            raise ToolError("A histogram needs at least one numeric column.")
+        x_column = mentioned_numeric or numeric_columns[0]
+        chart = make_chart_data(df, "histogram", x_column)
+        chart["title"] = f"Distribution of {x_column}"
+        return chart
+
+    if "scatter" in lowered_question:
+        x_column = mentioned_numeric
+        y_candidates = [column for column in numeric_columns if column != x_column]
+        y_column = mentioned(y_candidates) or (y_candidates[0] if y_candidates else None)
+        if not x_column and numeric_columns:
+            x_column = numeric_columns[0]
+            y_candidates = [column for column in numeric_columns if column != x_column]
+            y_column = mentioned(y_candidates) or (y_candidates[0] if y_candidates else None)
+        if not x_column or not y_column:
+            raise ToolError("A scatter chart needs two numeric columns.")
+        chart = make_chart_data(
+            df,
+            "scatter",
+            x_column,
+            y_column,
+            aggregate=False,
+        )
+        chart["title"] = f"{y_column} vs {x_column}"
+        return chart
+
+    requested_line = any(
+        term in lowered_question
+        for term in ("line chart", "line graph", "trend", "over time")
+    )
+    if not category_columns and len(numeric_columns) < 2:
+        if not numeric_columns:
+            raise ToolError("No numeric columns are available to chart.")
+        x_column = numeric_columns[0]
+        chart = make_chart_data(df, "histogram", x_column)
+        chart["title"] = f"Distribution of {x_column}"
+        return chart
+
+    x_candidates = category_columns or numeric_columns
+    x_column = mentioned(x_candidates) or x_candidates[0]
+    y_candidates = [column for column in numeric_columns if column != x_column]
+    y_column = mentioned(y_candidates) or (y_candidates[0] if y_candidates else None)
+    if not y_column:
+        y_column = x_column
+        operation = "count"
+    else:
+        operation = "sum"
+    chart_type = "line" if requested_line else "bar"
+    chart = make_chart_data(
+        df,
+        chart_type,
+        x_column,
+        y_column,
+        aggregate=True,
+        agg_operation=operation,
+    )
+    chart["title"] = (
+        f"{operation.capitalize()} of {y_column} by {x_column}"
+        if operation != "count"
+        else f"Row count by {x_column}"
+    )
+    return chart
+
+
 # ---------------------------------------------------------------------------
 # Main Agent Function
 # ---------------------------------------------------------------------------
@@ -584,6 +692,24 @@ def run_agent(
     question = question.strip()
     if not question:
         response.error = "Please enter a question."
+        return response
+
+    if _is_chart_request(question):
+        try:
+            chart = _make_requested_chart(question, dataset_info.df)
+        except ToolError as exc:
+            response.error = f"Could not create the requested chart: {exc}"
+            return response
+        response.charts.append(chart)
+        response.answer = "Generated a chart directly from the loaded dataset."
+        response.tool_calls_made.append({
+            "name": "make_chart_data",
+            "arguments": {"question": question},
+            "success": True,
+            "error": None,
+        })
+        response.total_tool_calls = 1
+        response.latency_ms = round((time.time() - start_time) * 1000, 1)
         return response
 
     # No API key → use demo mode immediately
@@ -753,10 +879,12 @@ def run_agent(
             )
         elif "429" in lowered or "rate limit" in lowered or "tokens per minute" in lowered:
             response.error = (
-                "❌ Groq rate limit reached. Wait about a minute for the quota window "
-                "to reset, then retry. The app limits each response to "
-                f"{settings.groq_max_tokens} output tokens; lower GROQ_MAX_TOKENS "
-                "further or use a model/account with a higher TPM limit if this persists."
+                "❌ Groq rate limit reached: the tokens-per-minute quota counts prompt and "
+                "response tokens and is shared by all apps using your Groq organization, so "
+                "it can happen even when you are not actively using this app. Wait for "
+                "the quota window to reset, reduce dataset size or chat-history length, or "
+                "use a model/account with more TPM capacity. GROQ_MAX_TOKENS only caps the "
+                "response; changing it does not increase your organization's quota."
             )
         else:
             response.error = f"❌ Groq API error: {err_str[:200]}"

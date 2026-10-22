@@ -209,6 +209,29 @@ def auth_status():
     return {"configured": configured}
 
 
+@app.get(
+    "/api/auth/me",
+    dependencies=[Depends(require_internal_api_key)],
+)
+def get_authenticated_user(
+    authorization: str | None = Header(default=None),
+    refresh_token: str | None = Header(default=None, alias="X-Refresh-Token"),
+):
+    access_token, refresh = _authorization_tokens(authorization, refresh_token)
+    try:
+        service = _supabase_user_service(
+            access_token=access_token,
+            refresh_token=refresh,
+        )
+        return {
+            "user": service.get_user(),
+            "access_token": service.access_token,
+            "refresh_token": service.refresh_token,
+        }
+    except UserServiceError as exc:
+        raise _map_user_service_error(exc) from None
+
+
 @app.post("/api/auth/signup", dependencies=[Depends(require_internal_api_key)])
 def sign_up(payload: AuthPayload, request: Request):
     _check_auth_rate_limit(request, "signup", payload.email)

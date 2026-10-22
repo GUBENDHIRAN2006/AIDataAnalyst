@@ -149,6 +149,15 @@ class SupabaseUserService:
         self.access_token = ""
         self.refresh_token = ""
 
+    def get_user(self) -> dict[str, str]:
+        user = self._request("GET", "/auth/v1/user", authenticated=True)
+        if not isinstance(user, dict) or not user.get("email"):
+            raise UserServiceError("Supabase returned an invalid user session.")
+        return {
+            "id": str(user.get("id", "")),
+            "email": str(user["email"]),
+        }
+
     def list_history(self, limit: int = 50) -> list[dict[str, Any]]:
         query = (
             "?select=id,title,question,answer,created_at"

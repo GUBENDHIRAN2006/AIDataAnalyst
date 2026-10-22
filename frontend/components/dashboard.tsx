@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
-import { RecordRow, writeWorkspace } from "@/lib/workspace";
+import { isAdminEmail } from "@/lib/access";
+import { readWorkspace, RecordRow, writeWorkspace } from "@/lib/workspace";
 
 type Provider = "PostgreSQL" | "MySQL" | "MongoDB" | "Supabase";
 type TableRef = { name: string; schema?: string | null };
@@ -35,8 +36,22 @@ export default function Dashboard() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [workspaceLoading, setWorkspaceLoading] = useState(true);
 
   useEffect(() => {
+    void readWorkspace()
+      .then((stored) => {
+        if (stored?.records.length) {
+          setRecords(stored.records);
+          setFilename(stored.filename);
+          setNotice(`Restored ${stored.filename} and its chat from this browser.`);
+        }
+      })
+      .catch((reason: unknown) => {
+        setError(reason instanceof Error ? reason.message : "Could not restore this browser workspace.");
+      })
+      .finally(() => setWorkspaceLoading(false));
+
     void fetch("/api/session", { cache: "no-store" })
       .then((response) => response.json())
       .then((value: Account) => setAccount(value))
@@ -56,6 +71,18 @@ export default function Dashboard() {
 
   function setField(name: string, value: string | number | boolean) {
     setConnection((current) => ({ ...current, [name]: value }));
+  }
+
+  async function saveDataset(nextFilename: string, nextRecords: RecordRow[], message: string) {
+    await writeWorkspace({
+      filename: nextFilename,
+      records: nextRecords,
+      messages: [],
+    });
+    setRecords(nextRecords);
+    setFilename(nextFilename);
+    setNotice(message);
+    setError("");
   }
 
   async function discoverTables(event: FormEvent<HTMLFormElement>) {
@@ -93,9 +120,12 @@ export default function Dashboard() {
       if (new TextEncoder().encode(JSON.stringify(rowData)).byteLength > MAX_WEB_DATA_BYTES) {
         throw new Error("This dataset is too large for a Vercel request. Select a smaller table.");
       }
-      setRecords(rowData);
-      setFilename(String(result.filename ?? table.name));
-      setNotice(`Imported ${rowData.length.toLocaleString()} rows.`);
+      const importedFilename = String(result.filename ?? table.name);
+      await saveDataset(
+        importedFilename,
+        rowData,
+        `Imported ${rowData.length.toLocaleString()} rows.`,
+      );
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not import this table.");
     } finally {
@@ -126,9 +156,13 @@ export default function Dashboard() {
           setError("The CSV has no data rows.");
           return;
         }
-        setRecords(result.data);
-        setFilename(file.name);
-        setNotice(`Loaded ${result.data.length.toLocaleString()} rows from ${file.name}.`);
+        void saveDataset(
+          file.name,
+          result.data,
+          `Loaded ${result.data.length.toLocaleString()} rows from ${file.name}.`,
+        ).catch((reason: unknown) => {
+          setError(reason instanceof Error ? reason.message : "Could not save this dataset in the browser workspace.");
+        });
       },
       error: (reason) => setError(reason.message),
     });
@@ -141,7 +175,14 @@ export default function Dashboard() {
       if (size > MAX_WEB_DATA_BYTES) {
         throw new Error("This dataset is too large for Vercel. Select a smaller table.");
       }
-      await writeWorkspace({ filename, records, messages: [] });
+      const currentWorkspace = await readWorkspace();
+      await writeWorkspace({
+        filename,
+        records,
+        messages: currentWorkspace?.filename === filename
+          ? currentWorkspace.messages
+          : [],
+      });
       router.push("/chat");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not start the analysis workspace.");
@@ -170,7 +211,8 @@ export default function Dashboard() {
           <img className="brand-image" src="/brand.svg" alt="" /> AI Data Analyst
         </Link>
         <nav className="nav-links">
-          <Link className="nav-link" href="/integrations">Integrations</Link>
+          <Link className="nav-link" href="/chat">Chat</Link>
+          {isAdminEmail(account.email) && <Link className="nav-link" href="/integrations">Integrations</Link>}
           {account.authenticated ? (
             <>
               <span className="small">{account.email}</span>
@@ -189,7 +231,7 @@ export default function Dashboard() {
             <h1>Connect data. Find answers.</h1>
             <p className="muted">Import a database table or CSV, then ask a question in plain language.</p>
           </div>
-          <Link className="button-secondary" href="/integrations">Manage integrations →</Link>
+          {isAdminEmail(account.email) && <Link className="button-secondary" href="/integrations">Manage integrations →</Link>}
         </section>
 
         {(error || notice) && <div className={`notice${error ? " error" : ""}`}>{error || notice}</div>}
@@ -198,7 +240,7 @@ export default function Dashboard() {
           <article className="card span-8">
             <div className="row">
               <div><div className="eyebrow">Step 1</div><h2>Choose a data source</h2></div>
-              <span className="small">Credentials stay in this browser session</span>
+              <span className="small">Connection credentials are not saved in your workspace</span>
             </div>
             <div className="provider-grid">
               {providers.map((item) => (
@@ -216,9 +258,9 @@ export default function Dashboard() {
             <form className="form-grid" onSubmit={discoverTables}>
               {provider === "PostgreSQL" || provider === "MySQL" ? (
                 <>
-                  <div className="field"><label>Host</label><input required value={String(connection.host ?? "")} onChange={(event) => setField("host", event.target.value)} placeholder="db.example.com" /></div>
+                  <div className="field"><label>Host</label><input required value={String(connection.host ?? "")} onChange={(event) => setField("host", event.target.value)} placeholder={provider === "MySQL" ? "Workbench hostname or db.example.com" : "db.example.com"} /></div>
                   <div className="field"><label>Port</label><input required type="number" value={String(connection.port ?? (provider === "PostgreSQL" ? 5432 : 3306))} onChange={(event) => setField("port", Number(event.target.value))} /></div>
-                  <div className="field"><label>Database</label><input required value={String(connection.database ?? "")} onChange={(event) => setField("database", event.target.value)} /></div>
+                  <div className="field"><label>{provider === "MySQL" ? "Database / schema" : "Database"}</label><input required value={String(connection.database ?? "")} onChange={(event) => setField("database", event.target.value)} /></div>
                   <div className="field"><label>Username</label><input required value={String(connection.username ?? "")} onChange={(event) => setField("username", event.target.value)} /></div>
                   <div className="field"><label>Password</label><input required type="password" value={String(connection.password ?? "")} onChange={(event) => setField("password", event.target.value)} /></div>
                   <div className="field"><label><input type="checkbox" checked={connection.ssl !== false} onChange={(event) => setField("ssl", event.target.checked)} style={{ width: "auto", marginRight: 8 }} />Require TLS</label></div>
@@ -233,7 +275,7 @@ export default function Dashboard() {
                 </>
               )}
               <div className="field full">
-                <button className="button" disabled={busy} type="submit">{busy ? "Connecting…" : `Connect ${selectedProviderName} and list tables`}</button>
+                <button className="button" disabled={busy || workspaceLoading} type="submit">{busy ? "Connecting…" : `Connect ${selectedProviderName} and list tables`}</button>
               </div>
             </form>
             {tables.length > 0 && (
@@ -251,6 +293,11 @@ export default function Dashboard() {
             <div className="notice">
               Use read-only credentials and trusted databases only. Avoid service-role keys. This deployment limits datasets to about 2.9 MB so analysis requests fit the backend payload limit.
             </div>
+            {provider === "MySQL" && (
+              <div className="notice">
+                For a hosted app, enter the MySQL server hostname and TCP port (usually 3306), not the saved MySQL Workbench connection name. A database running on your PC or localhost cannot be reached by Render; enable remote access, allow Render&apos;s outbound IPs in your database firewall, and grant the read-only account access from that host.
+              </div>
+            )}
           </article>
 
           <article className="card span-4">
@@ -259,7 +306,7 @@ export default function Dashboard() {
             <p className="muted">CSV files are parsed locally in your browser before analysis.</p>
             <div className="field" style={{ marginTop: 18 }}>
               <label htmlFor="csv-file">CSV file (up to 2.9 MB)</label>
-              <input id="csv-file" type="file" accept=".csv,text/csv" onChange={loadCsv} />
+              <input id="csv-file" type="file" accept=".csv,text/csv" onChange={loadCsv} disabled={workspaceLoading} />
             </div>
           </article>
 
@@ -284,7 +331,7 @@ export default function Dashboard() {
                 </div>
               </>
             ) : (
-              <p className="muted" style={{ marginTop: 20 }}>Connect a database table or upload a CSV. Its preview will appear here before you start a chat.</p>
+              <p className="muted" style={{ marginTop: 20 }}>{workspaceLoading ? "Restoring this browser workspace…" : "Connect a database table or upload a CSV. Its preview will appear here before you start a chat."}</p>
             )}
           </article>
         </section>

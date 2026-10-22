@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import ipaddress
+import logging
 import socket
 from dataclasses import dataclass
 from decimal import Decimal
@@ -21,6 +22,8 @@ from data_loader import (
     _validate_parsed_df,
 )
 from user_services import is_supabase_service_role_key
+
+logger = logging.getLogger(__name__)
 
 
 class DatabaseConnectionError(ValueError):
@@ -133,9 +136,14 @@ def _sql_tables(config: Mapping[str, Any]) -> list[TableRef]:
         return tables[:500]
     except DatabaseConnectionError:
         raise
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "SQL table discovery failed for provider=%s error_type=%s",
+            config.get("provider"),
+            type(exc).__name__,
+        )
         raise DatabaseConnectionError(
-            "Could not list database tables. Check the credentials and read permissions."
+            _sql_error_detail(exc, str(config.get("provider")), "list database tables")
         ) from None
     finally:
         engine.dispose()
@@ -189,10 +197,14 @@ def _read_sql_table(
         return frame, provider
     except DatabaseConnectionError:
         raise
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "SQL table import failed for provider=%s error_type=%s",
+            provider,
+            type(exc).__name__,
+        )
         raise DatabaseConnectionError(
-            "Could not import this table. Check that it exists and your account "
-            "has read-only access."
+            _sql_error_detail(exc, provider, "import this table")
         ) from None
     finally:
         engine.dispose()
@@ -359,7 +371,9 @@ def _validate_public_host(host: str, port: int) -> None:
     host = host.strip().strip("[]").rstrip(".")
     if not host or host.lower() == "localhost" or host.lower().endswith(".localhost"):
         raise DatabaseConnectionError(
-            "Production database connections must use a public database host."
+            "The hosted backend needs a publicly reachable database host. "
+            "Localhost refers to the Render service, not your computer or its "
+            "local database."
         )
     try:
         addresses = {
@@ -368,7 +382,8 @@ def _validate_public_host(host: str, port: int) -> None:
         }
     except OSError:
         raise DatabaseConnectionError(
-            "The database host could not be resolved."
+            "The database host could not be resolved. Enter the database server's "
+            "DNS hostname, not a local alias or saved connection label."
         ) from None
     if not addresses or any(
         not ipaddress.ip_address(address).is_global for address in addresses
@@ -376,6 +391,68 @@ def _validate_public_host(host: str, port: int) -> None:
         raise DatabaseConnectionError(
             "Production database connections cannot target private, local, or reserved networks."
         )
+
+
+def _sql_error_detail(exc: Exception, provider: str, operation: str) -> str:
+    if provider != "MySQL":
+        return (
+            f"Could not {operation}. Check the credentials, network access, "
+            "and read permissions."
+        )
+
+    original = getattr(exc, "orig", exc)
+    args = getattr(original, "args", ())
+    code = args[0] if args and isinstance(args[0], int) else None
+    mysql_errors = {
+        1044: (
+            "MySQL denied access to this database. Confirm the database name "
+            "and grant the read-only user access to it."
+        ),
+        1045: (
+            "MySQL rejected the username/password or the user's allowed host. "
+            "Check the credentials and grant this account read access from the "
+            "backend's network address."
+        ),
+        1049: "MySQL could not find that database. Check its exact name.",
+        1130: (
+            "MySQL is not configured to accept connections from the backend host. "
+            "Allow the backend's network address in the MySQL account and firewall."
+        ),
+        1142: (
+            "MySQL denied SELECT access. Grant the account SELECT permission "
+            "on the selected database."
+        ),
+        1143: (
+            "MySQL denied SELECT access to one or more columns. Grant the account "
+            "read access to the selected table."
+        ),
+        2002: (
+            "Could not reach the MySQL server. Check its hostname, port, and that "
+            "MySQL accepts TCP connections."
+        ),
+        2003: (
+            "Could not reach the MySQL server. Check hostname and port 3306, enable "
+            "remote TCP access, and allow the Render service's outbound IP addresses "
+            "in the database firewall. A local Workbench server is not reachable "
+            "from Render."
+        ),
+        2005: (
+            "MySQL's hostname could not be resolved. Use the database server's "
+            "hostname from Workbench's TCP/IP settings."
+        ),
+        2026: (
+            "MySQL TLS verification failed. Check the server certificate and hostname. "
+            "Use a trusted CA certificate; do not disable TLS for a public database."
+        ),
+    }
+    if code in mysql_errors:
+        return mysql_errors[code]
+    if code is not None:
+        logger.warning("MySQL operation failed with driver error code=%s", code)
+    return (
+        f"Could not {operation}. Check the MySQL host, port, database, credentials, "
+        "TLS settings, network allowlist, and SELECT permissions."
+    )
 
 
 def _supabase_headers(key: str, access_token: str = "") -> dict[str, str]:

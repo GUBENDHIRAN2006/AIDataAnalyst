@@ -171,6 +171,28 @@ class TestRunAgent:
             result = run_agent("", dataset_info)
         assert result.error == "Please enter a question."
 
+    def test_explicit_chart_request_is_generated_without_groq(self, dataset_info):
+        with patch.object(agent, "settings", _settings()), \
+             patch("agent.requests.post") as post:
+            result = run_agent("Create a bar chart of Revenue by Product.", dataset_info)
+
+        post.assert_not_called()
+        assert result.error is None
+        assert result.charts[0]["chart_type"] == "bar"
+        assert result.charts[0]["x_column"] == "Product"
+        assert result.charts[0]["y_column"] == "Revenue"
+        assert result.charts[0]["title"] == "Sum of Revenue by Product"
+
+    def test_histogram_request_uses_the_requested_numeric_column(self, dataset_info):
+        with patch.object(agent, "settings", _settings()), \
+             patch("agent.requests.post") as post:
+            result = run_agent("Show a histogram of Revenue.", dataset_info)
+
+        post.assert_not_called()
+        assert result.error is None
+        assert result.charts[0]["chart_type"] == "histogram"
+        assert result.charts[0]["x_column"] == "Revenue"
+
     def test_without_key_uses_demo_mode(self, dataset_info):
         mock_settings = _settings(groq_api_key="", has_groq_key=False)
         with patch.object(agent, "settings", mock_settings), \
@@ -294,5 +316,6 @@ class TestRunAgent:
 
         assert result.error is not None
         assert "rate limit reached" in result.error.lower()
-        assert "wait about a minute" in result.error.lower()
-        assert "1024 output tokens" in result.error
+        assert "shared by all apps" in result.error.lower()
+        assert "quota window to reset" in result.error.lower()
+        assert "does not increase" in result.error.lower()

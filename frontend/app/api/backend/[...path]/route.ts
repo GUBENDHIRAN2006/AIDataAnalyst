@@ -5,6 +5,7 @@ import { callBackend } from "@/lib/backend";
 const allowedRoutes = new Set([
   "health",
   "api/auth/status",
+  "api/auth/me",
   "api/history",
   "api/database/tables",
   "api/database/import",

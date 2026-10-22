@@ -42,10 +42,13 @@ export default function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <main className="auth-wrap">
       <section className="card auth-card">
-        <Link className="brand" href="/">
-          <img className="brand-image" src="/brand.svg" alt="" />
-          AI Data Analyst
-        </Link>
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+          <Link className="brand" href="/">
+            <img className="brand-image" src="/brand.svg" alt="" />
+            AI Data Analyst
+          </Link>
+          <Link className="nav-link" href="/chat">Chat</Link>
+        </div>
         <p className="eyebrow" style={{ marginTop: 30 }}>
           {mode === "login" ? "Welcome back" : "Get started"}
         </p>

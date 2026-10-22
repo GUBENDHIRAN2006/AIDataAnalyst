@@ -69,10 +69,39 @@ def test_supabase_connector_rejects_service_role_key():
 def test_production_database_connections_reject_private_networks(monkeypatch):
     monkeypatch.setattr(connectors.settings, "app_env", "production")
 
-    with pytest.raises(DatabaseConnectionError, match="public database host"):
+    with pytest.raises(DatabaseConnectionError, match="publicly reachable database host"):
         connectors._validate_public_host("localhost", 5432)
     with pytest.raises(DatabaseConnectionError, match="private, local, or reserved"):
         connectors._validate_public_host("127.0.0.1", 5432)
+
+
+def test_mysql_engine_uses_pymysql_and_preserves_special_characters(monkeypatch):
+    from unittest.mock import Mock
+
+    import sqlalchemy
+
+    monkeypatch.setattr(connectors.settings, "app_env", "development")
+    engine = Mock()
+    create_engine = Mock(return_value=engine)
+    monkeypatch.setattr(sqlalchemy, "create_engine", create_engine)
+
+    result = connectors._sql_engine({
+        "provider": "MySQL",
+        "host": "mysql.example.com",
+        "port": 3306,
+        "database": "analytics",
+        "username": "read_only",
+        "password": "p@ss:/word",
+        "ssl": False,
+    })
+
+    assert result is engine
+    url = create_engine.call_args.args[0]
+    assert url.drivername == "mysql+pymysql"
+    assert url.username == "read_only"
+    assert url.password == "p@ss:/word"
+    assert url.database == "analytics"
+    assert create_engine.call_args.kwargs["connect_args"]["connect_timeout"] == 5
 
 
 def test_production_database_host_allows_public_addresses(monkeypatch):
@@ -84,6 +113,26 @@ def test_production_database_host_allows_public_addresses(monkeypatch):
     )
 
     connectors._validate_public_host("db.example.com", 5432)
+
+
+def test_mysql_connection_errors_explain_host_and_permission_failures():
+    assert "allow the Render service" in connectors._sql_error_detail(
+        Exception(2003, "unreachable"),
+        "MySQL",
+        "list database tables",
+    )
+    assert "SELECT permission" in connectors._sql_error_detail(
+        Exception(1142, "permission denied"),
+        "MySQL",
+        "import this table",
+    )
+    secret = "do-not-echo-this-password"
+    detail = connectors._sql_error_detail(
+        Exception(1045, f"Access denied using {secret}"),
+        "MySQL",
+        "list database tables",
+    )
+    assert secret not in detail
 
 
 def test_mongodb_uri_cannot_disable_tls_verification():

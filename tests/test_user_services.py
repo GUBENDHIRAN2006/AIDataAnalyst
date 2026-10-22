@@ -64,6 +64,27 @@ def test_sign_in_stores_session_tokens(monkeypatch):
     assert service.refresh_token == "refresh-token"
 
 
+def test_get_user_uses_authenticated_supabase_endpoint(monkeypatch):
+    request = Mock(return_value=_response(
+        200,
+        {"id": "user-id", "email": "admin@example.com"},
+    ))
+    monkeypatch.setattr("user_services.requests.request", request)
+    service = SupabaseUserService(
+        "https://project.supabase.co",
+        "anon-key",
+        "access-token",
+        "refresh-token",
+    )
+
+    assert service.get_user() == {
+        "id": "user-id",
+        "email": "admin@example.com",
+    }
+    assert request.call_args.args == ("GET", "https://project.supabase.co/auth/v1/user")
+    assert request.call_args.kwargs["headers"]["Authorization"] == "Bearer access-token"
+
+
 def test_expired_access_token_is_refreshed_and_history_is_user_scoped(monkeypatch):
     calls = []
 

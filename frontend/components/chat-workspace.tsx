@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import AnalysisOutput from "@/components/analysis-output";
+import { isAdminEmail } from "@/lib/access";
 import {
   ChatMessage,
-  clearWorkspace,
   RecordRow,
   readWorkspace,
   Workspace,
@@ -108,8 +108,8 @@ export default function ChatWorkspace() {
           filename: workspace.filename,
           conversation_history: priorMessages
             .filter((message) => !message.error && message.content)
-            .slice(-6)
-            .map(({ role, content }) => ({ role, content: content.slice(-4000) })),
+            .slice(-4)
+            .map(({ role, content }) => ({ role, content: content.slice(-2000) })),
         }),
       });
       const assistantMessage: ChatMessage = {
@@ -156,15 +156,6 @@ export default function ChatWorkspace() {
     }
   }
 
-  async function startNewAnalysis() {
-    try {
-      await clearWorkspace();
-      window.location.assign("/");
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not clear the local workspace.");
-    }
-  }
-
   return (
     <div className="shell">
       <header className="topbar">
@@ -173,7 +164,8 @@ export default function ChatWorkspace() {
         </Link>
         <nav className="nav-links">
           <Link className="nav-link" href="/">Workspace</Link>
-          <Link className="nav-link" href="/integrations">Integrations</Link>
+          <Link className="nav-link" href="/chat">Chat</Link>
+          {isAdminEmail(account.email) && <Link className="nav-link" href="/integrations">Integrations</Link>}
           {account.authenticated
             ? <span className="small">{account.email}</span>
             : <Link className="button-secondary" href="/login">Sign in</Link>}
@@ -191,7 +183,7 @@ export default function ChatWorkspace() {
                 : "Prepare a dataset in your workspace to begin."}
             </p>
           </div>
-          <button className="button-secondary" onClick={startNewAnalysis} disabled={busy}>Start new analysis</button>
+          <Link className="button-secondary" href="/">Return to workspace</Link>
         </section>
 
         {error && !messages.length && <div className="notice error">{error}</div>}
@@ -214,7 +206,7 @@ export default function ChatWorkspace() {
                   <h2>Ask a question about your data</h2>
                   <p className="muted">Ask for calculations, trends, comparisons, data quality, or charts. Follow up naturally.</p>
                   <div className="suggestions">
-                    {["Summarize this dataset", "Show total sales by country", "Compare the top categories"].map((suggestion) => (
+                    {["Summarize this dataset", "Show total sales by country", "Compare the top categories", "Create a chart for this dataset"].map((suggestion) => (
                       <button key={suggestion} className="button-secondary" onClick={() => setQuestion(suggestion)} disabled={!workspace}>
                         {suggestion}
                       </button>

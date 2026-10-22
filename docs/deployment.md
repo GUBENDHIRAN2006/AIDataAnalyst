@@ -66,9 +66,31 @@ to sensitive tables just to make discovery work.
 
    Do **not** prefix either variable with `NEXT_PUBLIC_`. Do not add Supabase
    secrets or the Render API key to client-side code.
-4. Deploy. Open `/integrations` on the Vercel URL. Render should report
-   **Connected**; Supabase should report **Connected** after its settings are
-   entered on Render.
+4. Deploy, sign in with the administrator account, and open `/integrations` on
+   the Vercel URL. Render should report **Connected**; Supabase should report
+   **Connected** after its settings are entered on Render. The integrations
+   page is restricted to `gubendhiran0710@gmail.com`.
+
+## Connecting MySQL Workbench databases
+
+The MySQL form uses the connection's **TCP/IP server hostname**, port (usually
+`3306`), database/schema name, username, and password. A Workbench saved
+connection name is only a local label and is not a server address.
+
+When using the deployed app, the FastAPI service on Render—not Workbench or your
+browser—opens the database connection. The MySQL server must be reachable from
+Render: use a public database endpoint, allow the Render service's outbound IP
+addresses in the provider firewall, and grant a least-privilege account
+`SELECT` access from that remote host. A MySQL server running on your computer
+or addressed as `localhost`/`127.0.0.1` cannot be reached by Render. Do not
+expose a local database to the public internet to work around this; use a
+properly secured hosted database or run the application backend in a trusted
+network that can reach the server.
+
+For a local development deployment, run FastAPI on a machine/network that can
+reach the MySQL server and enter the same TCP/IP host and port shown in
+Workbench. Keep TLS verification enabled for public servers; only disable TLS
+for a trusted local development connection when the server does not support it.
 
 ## 5. Verify end-to-end
 
@@ -79,16 +101,19 @@ to sensitive tables just to make discovery work.
 4. Review the preview and click **Start analysis in chat**. Ask questions and
    follow-ups; text, result tables, and supported charts appear in the chat.
    Signed-in users can view saved history on the chat page.
-5. Visit `/integrations` to check Vercel, Render, and Supabase status.
+5. From the administrator account, visit `/integrations` to check Vercel,
+   Render, and Supabase status. Other signed-in users can access the workspace
+   and chat but do not see the integrations navigation option.
 
 The interface limits datasets to about 2.9 MB for analysis requests. This
 leaves room for chat history and keeps the request below Render's 3 MB
 backend limit. Use smaller tables; larger production data flows should be
 redesigned around paginated queries or private object storage rather than
 raising this limit.
-The active dataset and chat transcript are stored in browser-local IndexedDB
-so navigation and refresh do not discard the session. Clear the workspace on
-shared devices.
+The active dataset and chat transcript are stored in browser-local IndexedDB.
+They are saved when a CSV or database table is loaded, restored on the workspace
+page, and retained when navigating to and from chat or refreshing the page.
+Clear the workspace/browser data on shared devices.
 
 ## Important security and runtime notes
 
@@ -102,8 +127,12 @@ shared devices.
 - Render free instances may sleep when idle. The first request after idle can
   take longer; use an always-on plan for latency-sensitive production use.
 - Groq 429 rate-limit responses mean the model or organization quota was
-  exceeded. Wait for the TPM window to reset; lower `GROQ_MAX_TOKENS` or use a
-  Groq plan/model with higher limits if the issue continues.
+  exceeded. Tokens-per-minute usage includes the prompt and response and is
+  shared with other applications using the same Groq organization. Wait for the
+  quota window to reset, reduce dataset/chat context, or use a model/account
+  with higher capacity. `GROQ_MAX_TOKENS` only caps response length; it does not
+  increase the organization's quota. Explicit chart requests are generated
+  locally from the imported data and do not require a Groq request.
 - This repository does not include the user's provider credentials and cannot
   create services or deploy on their accounts. The steps above complete
   deployment after those values and the GitHub repository are supplied.

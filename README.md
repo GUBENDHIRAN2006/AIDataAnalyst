@@ -29,7 +29,7 @@ Analysing a new dataset manually requires coding knowledge and hours of work. **
 | 🔌 Database Imports | Read-only imports from PostgreSQL, MySQL, MongoDB, and Supabase |
 | 📊 Data Explorer | Preview, profile, column stats, and missing-value analysis |
 | 💬 AI Chat | Multi-turn natural-language Q&A with conversation history |
-| 📈 Chat Results | Dedicated chat page with text answers, result tables, and responsive charts |
+| 📈 Chat Results | Dedicated chat page with text answers, result tables, and charts generated locally for chart requests |
 | 👤 Optional Accounts | Use without signing in, or register/sign in with Supabase Auth |
 | 🕘 Saved History | Signed-in users can view their saved questions and answers |
 | 🌙 Dark Mode | Toggle the app theme from the sidebar |

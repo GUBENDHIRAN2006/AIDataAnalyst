@@ -91,6 +91,37 @@ def test_auth_status_reports_valid_supabase_configuration(monkeypatch):
     assert response.json() == {"configured": True}
 
 
+def test_authenticated_user_endpoint_validates_the_supabase_session(monkeypatch):
+    client = _client(monkeypatch)
+    service = SimpleNamespace(
+        get_user=Mock(return_value={"id": "admin-id", "email": "admin@example.com"}),
+        access_token="rotated-access",
+        refresh_token="rotated-refresh",
+    )
+    service_factory = Mock(return_value=service)
+    monkeypatch.setattr(backend_api, "_supabase_user_service", service_factory)
+
+    response = client.get(
+        "/api/auth/me",
+        headers={
+            "X-App-API-Key": API_KEY,
+            "Authorization": "Bearer user-access",
+            "X-Refresh-Token": "user-refresh",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "user": {"id": "admin-id", "email": "admin@example.com"},
+        "access_token": "rotated-access",
+        "refresh_token": "rotated-refresh",
+    }
+    service_factory.assert_called_once_with(
+        access_token="user-access",
+        refresh_token="user-refresh",
+    )
+
+
 def test_history_endpoint_forwards_user_tokens_and_returns_rotated_tokens(monkeypatch):
     client = _client(monkeypatch)
     service = SimpleNamespace(
